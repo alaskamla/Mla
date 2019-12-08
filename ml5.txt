@@ -1,0 +1,116 @@
+import math
+import csv
+
+def safe_div(x,y):
+    if y==0:
+        return 0
+    else:
+        return x/y
+
+def loaddataset(filename):
+    with open(filename) as csvfile:
+        data=csv.reader(csvfile)
+        data=list(data)
+        for i in range(len(data)):
+            vect=data[i]
+            for j in range(len(vect)):
+                data[i][j]=float(data[i][j])
+        return data
+def splitdataset(dataset,split):
+    n=split*(len(dataset))
+    copy=list(dataset)
+    train=[]
+    while len(train)<n:
+        train.append(copy.pop(-1))
+    return train,copy
+
+def mean(numbers):
+    return safe_div(sum(numbers),len(numbers))
+
+def stdev(numbers):
+    avg=mean(numbers)
+    variance=safe_div(sum([pow((x-avg),2) for x in numbers]),len(numbers))
+    return math.sqrt(variance)
+
+def summarize(row):
+    summaries={}
+    summaries=[(mean(attr),stdev(attr)) for attr in zip(*row)]
+    del summaries[-1]
+    return summaries
+
+def seperatebyclass(train):
+    seperated={}
+    for vect in train:
+        if vect[-1] not in seperated:
+            seperated[vect[-1]]=[]
+        else:
+            seperated[vect[-1]].append(vect)
+    return seperated
+
+def summarizebyclass(traindata):
+    summaries={}
+    seperated=seperatebyclass(traindata)
+    for classval,instances in seperated.items():
+        summaries[classval]=summarize(instances)
+    return summaries
+
+def getpredictions(testdata,summaries):
+    predictions={}
+    for i in range(len(testdata)):
+        predictions[i]=predict(testdata[i],summaries)
+    return predictions
+
+def predict(inputvect,summaries):
+    probablities=getclassprob(inputvect,summaries)
+    bestprob,bestlabel=-1,None
+    for classval,prob in probablities.items():
+        if bestlabel==None or prob>bestprob:
+            bestlabel=classval
+            bestprob=prob
+    return bestlabel
+
+def getclassprob(inputvect,summaries):
+    probablities={}
+    for classval,summary in summaries.items():
+        classprob=1
+        for i in range(len(summary)):
+            mean,stdev=summary[i]
+            x=inputvect[i]
+            classprob*=getprob(x,mean,stdev)
+        probablities[classval]=classprob
+    return probablities
+
+def getprob(x,mean,stdev):
+    exp=math.exp(-safe_div(math.pow((x-mean),2),(2*math.pow(stdev,2))))
+    prob=safe_div(1,(math.sqrt(2*math.pi)*stdev))*exp
+    return prob
+
+def getaccuracy(test,pred):
+    count=0
+    for i in range(len(pred)):
+        print("Original:",test[i][-1])
+        print("Predicted:",pred[i])
+        if test[i][-1]==pred[i]:
+            count+=1
+    acc=safe_div(count,len(test))*100.0
+    return acc
+
+def main():
+    dataset=loaddataset("prog5data.csv")
+    splitratio=0.80
+    train,test=splitdataset(dataset,splitratio)
+    print("Total Train dataset is",len(test))
+    print("Total Train dataset is",len(train))
+    print("Test dataset is")
+    for x in test:
+        print(x)
+    print("Train dataset is")
+    for x in train:
+        print(x)
+    summaries=summarizebyclass(train)
+    predictions=getpredictions(test,summaries)
+    print("Predictions and Orginals:\n")
+    acc=getaccuracy(test,predictions)
+    print("Accuracy:",acc)
+
+main()

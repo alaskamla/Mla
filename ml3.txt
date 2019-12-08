@@ -1,0 +1,95 @@
+import csv
+import math
+class Node:
+    def __init__(self,attribute):
+        self.attribute=attribute
+        self.children=[]
+        self.answer=" "
+def loadcsv(filename):
+    with open(filename) as csvfile:
+        data=csv.reader(csvfile)
+        dataset=list(data)
+        headers=dataset.pop(0)
+    return dataset,headers
+
+def subtables(data,col,delete):
+    coldata=[row[col] for row in data]
+    attr=list(set(coldata))
+    counts=[0]*len(attr)
+    for x in range(len(attr)):
+        for row in data:
+            if row[col]==attr[x]:
+                counts[x]+=1
+    dic=dict()
+    for x in range(len(attr)):
+        pos=0
+        dic[attr[x]]=[[0 for i in range(len(data[0]))] for j in range(counts[x])]
+        for y in range(len(data)):
+            if data[y][col]==attr[x]:
+                if delete:
+                    del data[y][col]
+                dic[attr[x]][pos]=data[y]
+                pos+=1
+    return attr,dic
+
+def computegain(col,data):
+    attr,dic=subtables(data,col,delete=False)
+    totalentropy=entropy([row[-1] for row in data])
+    for x in range(len(attr)):
+        ratio=len(dic[attr[x]])/len(data)
+        ent=entropy([row[-1] for row in dic[attr[x]]])
+        totalentropy-=ent*ratio
+    return totalentropy
+
+def buildtree(data,features):
+    lastcol=[row[-1] for row in data]
+    attr=set(list(lastcol))
+    if len(attr)==1:
+        node=Node(" ")
+        node.children=[]
+        node.answer=data[0][-1]
+        return node
+    c=len(data[0])-1
+    gains=[0]*c
+    for i in range(c):
+        gains[i]=computegain(i,data)
+    split=gains.index(max(gains))
+    attr,dic=subtables(data,split,delete=True)
+    fea=features[:split]+features[split+1:]
+    node=Node(features[split])
+    for x in range(len(attr)):
+        child=buildtree(dic[attr[x]],fea)
+        node.children.append((attr[x],child))
+    return node
+
+def entropy(S):
+    attr=list(set(S))
+    if len(attr)==1:
+        return 0
+    counts=[0]*len(attr)
+    for x in range(len(attr)):
+        counts[x]=sum([1 for row in S if row==attr[x]])/(len(S)*1.0)
+    sums=0
+    for c in counts:
+        sums+=(-1*c*math.log(c,2))
+    return sums
+
+def printtree(node,level,l):
+    if len(node.children)<1:
+        print(" "*level,node.answer)
+        return
+    print(" "*level,node.attribute)
+    l[level].append(node.attribute)
+    for x,y in node.children:
+        print(" "*(level+1),x)
+        l[level+1].append(x)
+        printtree(y,level+2,l)
+
+data,features=loadcsv("playtennisorginal.csv")
+node=buildtree(data,features)
+di=dict()
+for i in  range(len(data)):
+    di[i]=[]
+printtree(node,0,di)
+for i in di.keys():
+    print(" "*(len(di)-i-len(di[i])),di[i])
